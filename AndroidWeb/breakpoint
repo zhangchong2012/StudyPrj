@@ -1,0 +1,109 @@
+这是在收到网络数据后,从网络移植部分调用到RenderObject::addChild函数的过程.
+
+    WebCore::RenderObject::addChild
+    WebCore::RenderBlock::addChild
+    WebCore::Node::createRendererIfNeeded
+    WebCore::HTMLParser::insertNode
+    WebCore::HTMLParser::insertNodeAfterLimitBlockDepth
+    WebCore::HTMLParser::parseToken
+    WebCore::HTMLTokenizer::processToken
+    WebCore::HTMLTokenizer::parseTag
+    WebCore::HTMLTokenizer::write
+    WebCore::FrameLoader::write
+    WebCore::FrameLoader::addData
+    WebCore::FrameLoaderClientQt::committedLoad
+    WebCore::FrameLoader::committedLoad
+    WebCore::DocumentLoader::commitLoad
+    WebCore::DocumentLoader::receivedData
+    WebCore::FrameLoader::receivedData
+    WebCore::MainResourceLoader::addData
+    WebCore::ResourceLoader::didReceiveData
+    WebCore::MainResourceLoader::didReceiveData
+    WebCore::ResourceLoader::didReceiveData
+    WebCore::QNetworkReplyHandler::forwardData
+
+   
+    B.给ResourceHandleQt.cpp文件中的ResourceHandle::start加上断点,加载网页:
+        WebCore::ResourceHandle::start(WebCore::Frame * frame=0x035c5810)
+        WebCore::ResourceHandle::create(const WebCore::ResourceRequest & request={...}, WebCore::ResourceHandleClient * client=0x035feb40, WebCore::Frame * frame=0x035c5810, bool defersLoading=false, bool shouldContentSniff=false)
+        WebCore::MainResourceLoader::loadNow(WebCore::ResourceRequest & r={...})
+        WebCore::MainResourceLoader::load(const WebCore::ResourceRequest & r={...}, const WebCore::SubstituteData & substituteData={...})
+        WebCore::DocumentLoader::startLoadingMainResource(unsigned long identifier=1)
+        WebCore::FrameLoader::continueLoadAfterWillSubmitForm()
+        WebCore::FrameLoader::continueLoadAfterNavigationPolicy(const WebCore::ResourceRequest & __formal={...}, WTF::PassRefPtr<WebCore::FormState> formState={...}, bool shouldContinue=true)
+        WebCore::FrameLoader::callContinueLoadAfterNavigationPolicy(void * argument=0x035c5840, const WebCore::ResourceRequest & request={...}, WTF::PassRefPtr<WebCore::FormState> formState={...}, bool shouldContinue=true)
+        WebCore::PolicyCallback::call(bool shouldContinue=true)
+        WebCore::PolicyChecker::continueAfterNavigationPolicy(WebCore::PolicyAction policy=PolicyUse)
+        WebCore::FrameLoaderClientQt::callPolicyFunction(void (WebCore::PolicyAction)* function=0x1076f340, WebCore::PolicyAction action=PolicyUse)
+        WebCore::FrameLoaderClientQt::dispatchDecidePolicyForNavigationAction(void (WebCore::PolicyAction)* function=0x1076f340, const WebCore::NavigationAction & action={...}, const WebCore::ResourceRequest & request={...}, WTF::PassRefPtr<WebCore::FormState> __formal={...})
+        WebCore::PolicyChecker::checkNavigationPolicy(const WebCore::ResourceRequest & request={...}, WebCore::DocumentLoader * loader=0x035fe080, WTF::PassRefPtr<WebCore::FormState> formState={...}, void (void *, const WebCore::ResourceRequest &, WTF::PassRefPtr<WebCore::FormState>, bool)* function=0x102f0540, void * argument=0x035c5840)
+        WebCore::FrameLoader::loadWithDocumentLoader(WebCore::DocumentLoader * loader=0x035fe080, WebCore::FrameLoadType type=FrameLoadTypeStandard, WTF::PassRefPtr<WebCore::FormState> prpFormState={...})
+        WebCore::FrameLoader::load(WebCore::DocumentLoader * newDocumentLoader=0x035fe080)
+        WebCore::FrameLoader::load(const WebCore::ResourceRequest & request={...}, const WebCore::SubstituteData & substituteData={...}, bool lockHistory=false)
+        WebCore::FrameLoader::load(const WebCore::ResourceRequest & request={...}, bool lockHistory=false)
+        QWebFrame::load(const QNetworkRequest & req={...}, QNetworkAccessManager::Operation operation=GetOperation, const QByteArray & body={...})
+        QWebFrame::load(const QUrl & url={...})
+        QWebView::load(const QUrl & url={...})
+        WebView::loadUrl(const QUrl & url={...})
+        TabWidget::loadUrlInCurrentTab(const QUrl & url={...})
+        BrowserMainWindow::loadUrl(const QUrl & url={...})
+        BrowserMainWindow::loadPage(const QString & page={...})
+        BrowserMainWindow::slotHome()
+        BrowserApplication::postLaunch()
+    这是程序启动到发起一次网络下载操作的流程,ResourceHandle包含了一个QNetworkReplyHandler对象,并在有data可read的时候执行QNetworkReplyHandler::forwardData. A和B在这里联系起来.
+
+    C. 给drawTextCommon加上断点,加载一个网页:
+        WebCore::drawTextCommon()
+        WebCore::Font::drawComplexText()
+        WebCore::Font::drawText()
+        WebCore::GraphicsContext::drawText()
+        WebCore::paintTextWithShadows()
+        WebCore::InlineTextBox::paint()
+        WebCore::InlineFlowBox::paint()
+        WebCore::RootInlineBox::paint()
+        WebCore::RenderLineBoxList::paint()
+        WebCore::RenderBlock::paintContents()
+        WebCore::RenderBlock::paintObject()
+        WebCore::RenderBlock::paint()
+        WebCore::RenderLayer::paintLayer()
+        WebCore::RenderLayer::paint()
+        WebCore::FrameView::paintContents()
+        QWebFramePrivate::renderRelativeCoords()
+        QWebFrame::render(QPainter * painter=0x0012cb40, const QRegion & clip={...})
+        QWebView::paintEvent(QPaintEvent * ev=0x0012d364)
+
+    这是一次绘画的流程,从重画事件一直到读取保存在RenderObject,RenderStyle(它们是webkit中对CSS部分的实现)中的信息进行paint.
+
+    D.给JsObject.cpp里的jsobject::put加上断点,给jscore里的parser.cpp的didfinishParsing加上断点, 加载一个有js代码的网页.
+        
+        (1) jsobject::put
+        JSC::JSObject::put(JSC::ExecState * exec=0x03d00048, const JSC::Identifier & propertyName={...}, JSC::JSValue value={...}, JSC::PutPropertySlot & slot={...})
+        JSC::JSValue::put(JSC::ExecState * exec=0x03d00048, const JSC::Identifier & propertyName={...}, JSC::JSValue value={...}, JSC::PutPropertySlot & slot={...})
+        cti_op_put_by_id(void * * args=0x0012cf60)
+        cti_op_convert_this@4()
+        JSC::JITCode::execute(JSC::RegisterFile * registerFile=0x03501cac, JSC::ExecState * callFrame=0x03d00048, JSC::JSGlobalData * globalData=0x034dd0e0, JSC::JSValue * exception=0x0012d094)
+        JSC::Interpreter::execute(JSC::ProgramExecutable * program=0x0356b508, JSC::ExecState * callFrame=0x0354b6f8, JSC::ScopeChainNode *         JSC::JSObject * thisObj=0x03bc0000, JSC::JSValue * exception=0x0012d094)
+       
+        (2) parser::didfinishparsing
+        JSC::Parser::didFinishParsing(JSC::SourceElements * sourceElements=0x03545c58, JSC::ParserArenaData<WTF::Vector<std::pair<JSC::Identifier const *,unsigned int>,0> > * varStack=0x03545ac8, JSC::ParserArenaData<WTF::Vector<JSC::FunctionBodyNode *,0> > * funcStack=0x00000000, unsigned int features=6, int lastLine=36, int numConstants=0)
+        jscyyparse(void * globalPtr=0x034bd150)
+        JSC::Parser::parse(JSC::JSGlobalData * globalData=0x034bd150, int * errLine=0x0012d034, JSC::UString * errMsg=0x0012d03c)
+        JSC::Parser::parse<JSC::ProgramNode>(JSC::JSGlobalData * globalData=0x034bd150, JSC::Debugger * debugger=0x00000000, JSC::ExecState * debuggerExecState=0x03542c80, const JSC::SourceCode & source={...}, int * errLine=0x0012d034, JSC::UString * errMsg=0x0012d03c)
+        JSC::ProgramExecutable::compile(JSC::ExecState * exec=0x03542c80, JSC::ScopeChainNode * scopeChainNode=0x03542de0)
+       
+        (3) 2者共同部分
+        JSC::evaluate(JSC::ExecState * exec=0x0354b6f8, JSC::ScopeChain & scopeChain={...}, const JSC::SourceCode & source={...}, JSC::JSValue thisValue={...})
+        WebCore::ScriptController::evaluateInWorld(const WebCore::ScriptSourceCode & sourceCode={...}, WebCore::DOMWrapperWorld * world=0x03501f98)
+        WebCore::ScriptController::evaluate(const WebCore::ScriptSourceCode & sourceCode={...})
+        WebCore::ScriptController::executeScript(const WebCore::ScriptSourceCode & sourceCode={...})
+        WebCore::HTMLTokenizer::scriptExecution(const WebCore::ScriptSourceCode & sourceCode={...}, WebCore::HTMLTokenizer::State state={...})
+        WebCore::HTMLTokenizer::executeExternalScriptsIfReady()
+        WebCore::HTMLTokenizer::notifyFinished(WebCore::CachedResource * __formal=0x0353fa08)
+        WebCore::CachedScript::checkNotify()
+        WebCore::CachedScript::data(WTF::PassRefPtr<WebCore::SharedBuffer> data={...}, bool allDataReceived=true)
+        WebCore::Loader::Host::didFinishLoading(WebCore::SubresourceLoader * loader=0x03540640)
+        WebCore::SubresourceLoader::didFinishLoading()
+        WebCore::ResourceLoader::didFinishLoading(WebCore::ResourceHandle * __formal=0x0353ffd8)
+        WebCore::QNetworkReplyHandler::finish()
+    这是一个网页加载完毕到javascript解析逻辑,以及在js核心里的流程.
+
